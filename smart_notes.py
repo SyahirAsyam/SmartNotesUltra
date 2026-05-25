@@ -376,33 +376,63 @@ def add_note():
             )
 
 
+
 def delete_note():
 
     selected = list_notes.currentItem()
 
     if not selected:
+
+        QMessageBox.warning(
+            notes_win,
+            "Error",
+            "⚠ Pilih note dulu!"
+        )
+
         return
 
     note_name = get_real_note_name(
         selected.text()
     )
 
+    confirm = QMessageBox.question(
+        notes_win,
+        "Delete Note",
+        f"Yakin mau hapus '{note_name}' ?",
+        QMessageBox.Yes | QMessageBox.No
+    )
+
+    if confirm != QMessageBox.Yes:
+        return
+
+    # HAPUS NOTE
     if note_name in notes:
         del notes[note_name]
 
+    # HAPUS PIN
     if note_name in pinned_notes:
         pinned_notes.remove(note_name)
 
+    # CLEAR EDITOR
     for editor in editors:
+
+        editor.blockSignals(True)
+
         editor.clear()
+
+        editor.blockSignals(False)
+
+    # HAPUS SELECTION
+    list_notes.clearSelection()
 
     refresh_notes_list()
 
     save_data()
 
     status_label.setText(
-        "🗑 Deleted"
+        "🗑 Note Deleted"
     )
+
 
 
 def rename_note():
@@ -1022,5 +1052,4 @@ if last_opened_note in notes:
 notes_win.show()
 
 app.exec_()
-
 
