@@ -13,6 +13,10 @@ app = QApplication([])
 
 # ================= WINDOW =================
 notes_win = QWidget()
+
+
+
+
 notes_win.setWindowTitle("Smart Notes Ultra V3")
 notes_win.resize(1500, 850)
 
@@ -20,6 +24,10 @@ notes_win.resize(1500, 850)
 # ================= FILE =================
 FILE_NAME = "notes_data.json"
 LOCK_FILE = "lock_data.json"
+
+BACKUP_FOLDER = "backup"
+BACKUP_FILE = "backup/notes_backup.json"
+
 
 
 # ================= DATA =================
@@ -72,6 +80,10 @@ btn_lock = QPushButton("🔒 Lock")
 btn_date = QPushButton("📅 Date")
 
 btn_clear = QPushButton("🧹 Clear")
+
+btn_export = QPushButton("📄 Export TXT")
+
+
 
 
 # ================= STATUS =================
@@ -140,6 +152,8 @@ left_layout.addWidget(btn_lock)
 left_layout.addWidget(btn_date)
 
 left_layout.addWidget(btn_clear)
+left_layout.addWidget(btn_export)
+
 
 theme_layout = QHBoxLayout()
 
@@ -240,6 +254,39 @@ def refresh_notes_list():
                 break
 
 
+def create_backup():
+
+    if not os.path.exists(
+        BACKUP_FOLDER
+    ):
+
+        os.makedirs(
+            BACKUP_FOLDER
+        )
+
+    data = {
+
+        "notes": notes,
+        "pinned": pinned_notes,
+        "last_opened": last_opened_note,
+        "theme": current_theme
+
+    }
+
+    with open(
+        BACKUP_FILE,
+        "w",
+        encoding="utf-8"
+    ) as file:
+
+        json.dump(
+            data,
+            file,
+            ensure_ascii=False,
+            indent=4
+        )
+
+
 def save_data():
 
     data = {
@@ -283,6 +330,10 @@ def save_data():
             ensure_ascii=False,
             indent=4
         )
+
+        
+        create_backup()
+
 
 
 def load_data():
@@ -889,6 +940,57 @@ def insert_date():
         f"\n📅 {date}\n"
     )
 
+def export_txt():
+
+    selected = list_notes.currentItem()
+
+    if not selected:
+
+        QMessageBox.warning(
+            notes_win,
+            "Error",
+            "⚠ Pilih note dulu!"
+        )
+
+        return
+
+    note_name = get_real_note_name(
+        selected.text()
+    )
+
+    content = ""
+
+    for i, editor in enumerate(editors):
+
+        content += f"===== TAB {i+1} =====\n\n"
+
+        content += editor.toPlainText()
+
+        content += "\n\n"
+
+    file_name, _ = QFileDialog.getSaveFileName(
+        notes_win,
+        "Export TXT",
+        f"{note_name}.txt",
+        "Text Files (*.txt)"
+    )
+
+    if file_name:
+
+        with open(
+            file_name,
+            "w",
+            encoding="utf-8"
+        ) as file:
+
+            file.write(content)
+
+        status_label.setText(
+            "📄 Exported TXT"
+        )
+
+
+
 
 # ================= CONNECTIONS =================
 btn_copy.clicked.connect(copy_current_tab)
@@ -921,6 +1023,11 @@ btn_lock.clicked.connect(lock_note)
 btn_date.clicked.connect(insert_date)
 
 btn_clear.clicked.connect(clear_current_tab)
+
+btn_export.clicked.connect(
+    export_txt
+)
+
 
 list_notes.itemSelectionChanged.connect(show_note)
 
