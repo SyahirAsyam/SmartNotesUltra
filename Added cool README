@@ -1,0 +1,54 @@
+# Smart Notes Ultra V3
+
+Smart Notes Ultra adalah aplikasi notes desktop modern menggunakan Python & PyQt5.
+
+---
+
+# ✨ Features
+
+* 📝 Multi Notes System
+* 📌 Pin Notes
+* 🔍 Search Notes
+* 💾 Auto Save
+* 🔒 Password Lock
+* 🎨 Multiple Themes
+* 📋 Copy & Paste
+* ✅ Todo Checklist
+* ✏ Rich Text Editor
+* 📊 Word Counter
+* 📅 Date Insert
+* ⌨ Keyboard Shortcuts
+* 📂 Multi Tabs
+
+---
+
+# ⌨ Shortcuts
+
+| Shortcut         | Function    |
+| ---------------- | ----------- |
+| Ctrl + S         | Save Note   |
+| Ctrl + N         | New Note    |
+| Ctrl + D         | Delete Note |
+| Ctrl + L         | Lock Notes  |
+| Ctrl + P         | Pin Note    |
+| Ctrl + F         | Search      |
+| Ctrl + B         | Bold        |
+| Ctrl + I         | Italic      |
+| Ctrl + U         | Underline   |
+| Ctrl + Shift + C | Copy        |
+| Ctrl + Shift + V | Paste       |
+| Ctrl + Tab       | Next Tab    |
+
+---
+
+# 🛠 Made With
+
+* Python
+* PyQt5
+* JSON Storage
+
+---
+
+# 🚀 Author
+
+Made by SyahirAsyam 😭🔥
