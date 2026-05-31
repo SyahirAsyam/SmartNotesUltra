@@ -3,22 +3,58 @@ from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 
-import json
+import sys
 import os
+import ctypes
+import json
+
+
+# ================= APP ID WINDOWS =================
+myappid = "smart.notes.ultra.v4"
+
+ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+    myappid
+)
 
 
 # ================= APP =================
-app = QApplication([])
+app = QApplication(sys.argv)
+
+
+# ================= ICON PATH =================
+BASE_DIR = os.path.dirname(
+    os.path.abspath(__file__)
+)
+
+ICON_PATH = os.path.join(
+    BASE_DIR,
+    "smart_notes.ico"
+)
 
 
 # ================= WINDOW =================
 notes_win = QWidget()
 
+notes_win.setWindowTitle(
+    "Smart Notes Ultra V4"
+)
 
-
-
-notes_win.setWindowTitle("Smart Notes Ultra V3")
 notes_win.resize(1500, 850)
+
+
+# ================= SET ICON =================
+icon = QIcon(ICON_PATH)
+
+app.setWindowIcon(icon)
+
+notes_win.setWindowIcon(icon)
+
+
+
+
+
+
+
 
 
 # ================= FILE =================
@@ -33,6 +69,13 @@ BACKUP_FILE = "backup/notes_backup.json"
 # ================= DATA =================
 notes = {}
 pinned_notes = []
+recent_notes = []
+
+recycle_bin = {}
+
+
+note_colors = {}
+favorite_notes = []
 
 locked = False
 note_password = ""
@@ -41,6 +84,8 @@ last_opened_note = ""
 current_theme = "dark"
 
 loading_note = False
+
+unsaved_changes = False
 
 
 # ================= WIDGETS =================
@@ -60,6 +105,8 @@ btn_dark = QPushButton("🌙 Dark")
 btn_light = QPushButton("☀ Light")
 
 btn_pin = QPushButton("📌 Pin")
+btn_color = QPushButton("🎨 Color")
+btn_favorite = QPushButton("⭐ Favorite")
 
 btn_blue = QPushButton("💙 Blue")
 btn_red = QPushButton("❤️ Red")
@@ -82,6 +129,10 @@ btn_date = QPushButton("📅 Date")
 btn_clear = QPushButton("🧹 Clear")
 
 btn_export = QPushButton("📄 Export TXT")
+
+btn_restore = QPushButton(
+    "♻ Restore"
+)
 
 
 
@@ -134,11 +185,25 @@ left_layout.addWidget(search_bar)
 left_layout.addWidget(list_notes)
 
 left_layout.addWidget(btn_new)
-left_layout.addWidget(btn_rename)
-left_layout.addWidget(btn_delete)
-left_layout.addWidget(btn_save)
+feature_layout_2 = QHBoxLayout()
 
-left_layout.addWidget(btn_pin)
+feature_layout_2.addWidget(btn_rename)
+feature_layout_2.addWidget(btn_delete)
+feature_layout_2.addWidget(btn_save)
+
+left_layout.addLayout(
+    feature_layout_2
+)
+
+feature_layout_1 = QHBoxLayout()
+
+feature_layout_1.addWidget(btn_pin)
+feature_layout_1.addWidget(btn_color)
+feature_layout_1.addWidget(btn_favorite)
+
+left_layout.addLayout(
+    feature_layout_1
+)
 
 todo_layout = QHBoxLayout()
 
@@ -153,6 +218,7 @@ left_layout.addWidget(btn_date)
 
 left_layout.addWidget(btn_clear)
 left_layout.addWidget(btn_export)
+left_layout.addWidget(btn_restore)
 
 
 theme_layout = QHBoxLayout()
@@ -203,13 +269,38 @@ notes_win.setLayout(main_layout)
 # ================= FUNCTIONS =================
 def get_real_note_name(name):
 
-    if name.startswith("📌 "):
-        return name.replace("📌 ", "")
+
+    prefixes = [
+        "⭐ ",
+        "📌 ",
+        "🕒 "
+    ]
+
+    changed = True
+
+    while changed:
+
+        changed = False
+
+        for prefix in prefixes:
+
+            if name.startswith(prefix):
+
+                name = name.replace(
+                    prefix,
+                    "",
+                    1
+                )
+
+                changed = True
 
     return name
 
 
+
+
 def refresh_notes_list():
+
 
     current_note = None
 
@@ -224,19 +315,71 @@ def refresh_notes_list():
 
     list_notes.clear()
 
+    # PINNED
     for note in pinned_notes:
 
-        if note in notes:
+        if note not in notes:
+            continue
 
-            list_notes.addItem(
-                "📌 " + note
+        display_name = "📌 " + note
+
+        if note in favorite_notes:
+            display_name = "⭐ " + display_name
+
+        item = QListWidgetItem(display_name)
+
+        if note in note_colors:
+            item.setForeground(
+                QColor(note_colors[note])
             )
 
+        list_notes.addItem(item)
+
+    # RECENT
+    for note in recent_notes:
+
+        if note not in notes:
+            continue
+
+        if note in pinned_notes:
+            continue
+
+        display_name = "🕒 " + note
+
+        if note in favorite_notes:
+            display_name = "⭐ " + display_name
+
+        item = QListWidgetItem(display_name)
+
+        if note in note_colors:
+            item.setForeground(
+                QColor(note_colors[note])
+            )
+
+        list_notes.addItem(item)
+
+    # NORMAL
     for note in notes:
 
-        if note not in pinned_notes:
+        if note in pinned_notes:
+            continue
 
-            list_notes.addItem(note)
+        if note in recent_notes:
+            continue
+
+        display_name = note
+
+        if note in favorite_notes:
+            display_name = "⭐ " + display_name
+
+        item = QListWidgetItem(display_name)
+
+        if note in note_colors:
+            item.setForeground(
+                QColor(note_colors[note])
+            )
+
+        list_notes.addItem(item)
 
     list_notes.blockSignals(False)
 
@@ -246,12 +389,19 @@ def refresh_notes_list():
 
             item = list_notes.item(i)
 
-            if get_real_note_name(
-                item.text()
-            ) == current_note:
+            if current_note in item.text():
 
                 list_notes.setCurrentItem(item)
+
                 break
+
+
+
+
+
+
+
+
 
 
 def create_backup():
@@ -266,12 +416,16 @@ def create_backup():
 
     data = {
 
-        "notes": notes,
-        "pinned": pinned_notes,
-        "last_opened": last_opened_note,
-        "theme": current_theme
+    "notes": notes,
+    "pinned": pinned_notes,
+    "recent": recent_notes,
+    "favorites": favorite_notes,
+    "colors": note_colors,
+    "recycle_bin": recycle_bin,
+    "last_opened": last_opened_note,
+    "theme": current_theme
 
-    }
+}
 
     with open(
         BACKUP_FILE,
@@ -336,64 +490,118 @@ def save_data():
 
 
 
+
 def load_data():
 
     global notes
     global pinned_notes
+    global recycle_bin
+    global recent_notes
+    global favorite_notes
+    global note_colors
     global locked
     global note_password
     global last_opened_note
     global current_theme
 
+    # ================= NOTES DATA =================
     if os.path.exists(FILE_NAME):
 
-        with open(
-            FILE_NAME,
-            "r",
-            encoding="utf-8"
-        ) as file:
+        try:
 
-            data = json.load(file)
+            with open(
+                FILE_NAME,
+                "r",
+                encoding="utf-8"
+            ) as file:
 
-            notes = data.get(
-                "notes",
-                {}
-            )
+                data = json.load(file)
 
-            pinned_notes = data.get(
-                "pinned",
-                []
-            )
+                notes = data.get(
+                    "notes",
+                    {}
+                )
 
-            last_opened_note = data.get(
-                "last_opened",
-                ""
-            )
+                pinned_notes = data.get(
+                    "pinned",
+                    []
+                )
 
-            current_theme = data.get(
-                "theme",
-                "dark"
-            )
+                recycle_bin = data.get(
+                    "recycle_bin",
+                    {}
+                )
 
+                recent_notes = data.get(
+                    "recent",
+                    []
+                )
+
+                favorite_notes = data.get(
+                    "favorites",
+                    []
+                )
+
+                note_colors = data.get(
+                    "colors",
+                    {}
+                )
+
+                last_opened_note = data.get(
+                    "last_opened",
+                    ""
+                )
+
+                current_theme = data.get(
+                    "theme",
+                    "dark"
+                )
+
+        
+        except Exception as e:
+
+            print("ERROR JSON:", e)
+
+            notes = {}
+            pinned_notes = []
+            last_opened_note = ""
+            current_theme = "dark"
+
+            save_data()
+
+
+
+    # ================= LOCK DATA =================
     if os.path.exists(LOCK_FILE):
 
-        with open(
-            LOCK_FILE,
-            "r",
-            encoding="utf-8"
-        ) as file:
+        try:
 
-            lock_data = json.load(file)
+            with open(
+                LOCK_FILE,
+                "r",
+                encoding="utf-8"
+            ) as file:
 
-            locked = lock_data.get(
-                "locked",
-                False
-            )
+                lock_data = json.load(file)
 
-            note_password = lock_data.get(
-                "password",
-                ""
-            )
+                locked = lock_data.get(
+                    "locked",
+                    False
+                )
+
+                note_password = lock_data.get(
+                    "password",
+                    ""
+                )
+
+        except:
+
+            print("ERROR: lock_data.json rusak!")
+
+            locked = False
+            note_password = ""
+
+
 
 
 # ================= NOTE =================
@@ -418,7 +626,11 @@ def add_note():
                 ""
             ]
 
+            print("NOTES SEKARANG:", notes)
+
             refresh_notes_list()
+
+            update_word_count()
 
             save_data()
 
@@ -458,7 +670,10 @@ def delete_note():
 
     # HAPUS NOTE
     if note_name in notes:
-        del notes[note_name]
+
+        recycle_bin[note_name] = notes[note_name]
+
+    del notes[note_name]
 
     # HAPUS PIN
     if note_name in pinned_notes:
@@ -478,11 +693,49 @@ def delete_note():
 
     refresh_notes_list()
 
+    update_word_count()
+
     save_data()
 
     status_label.setText(
         "🗑 Note Deleted"
     )
+
+
+def restore_note():
+
+    if not recycle_bin:
+
+        QMessageBox.information(
+            notes_win,
+            "Restore",
+            "Trash kosong."
+        )
+
+        return
+
+    note_name, ok = QInputDialog.getItem(
+        notes_win,
+        "Restore Note",
+        "Pilih note:",
+        list(recycle_bin.keys()),
+        0,
+        False
+    )
+
+    if ok:
+
+        notes[note_name] = recycle_bin.pop(
+            note_name
+        )
+
+        refresh_notes_list()
+
+        save_data()
+
+        status_label.setText(
+            "♻ Note Restored"
+        )
 
 
 
@@ -538,6 +791,61 @@ def pin_note():
     save_data()
 
 
+def color_note():
+
+    selected = list_notes.currentItem()
+
+    if not selected:
+        return
+
+    note_name = get_real_note_name(
+        selected.text()
+    )
+
+    color = QColorDialog.getColor()
+
+    if color.isValid():
+
+        note_colors[note_name] = color.name()
+
+        refresh_notes_list()
+
+        save_data()
+
+
+def favorite_note():
+
+    selected = list_notes.currentItem()
+
+    if not selected:
+        return
+
+    note_name = get_real_note_name(
+        selected.text()
+    )
+
+    note_name = note_name.replace(
+        "⭐ ",
+        ""
+    )
+
+    if note_name in favorite_notes:
+
+        favorite_notes.remove(
+            note_name
+        )
+
+    else:
+
+        favorite_notes.append(
+            note_name
+        )
+
+    refresh_notes_list()
+
+    save_data()
+
+
 def show_note():
 
     global loading_note
@@ -570,6 +878,14 @@ def show_note():
     loading_note = False
 
     last_opened_note = note_name
+
+    if note_name in recent_notes:
+        recent_notes.remove(note_name)
+
+        recent_notes.insert(0, note_name)
+
+    if len(recent_notes) > 10:
+        recent_notes.pop()
 
     save_data()
 
@@ -626,6 +942,22 @@ def auto_save():
 
     save_data()
 
+    global unsaved_changes
+
+unsaved_changes = False
+
+time_now = QTime.currentTime().toString(
+    "HH:mm:ss"
+)
+
+status_label.setText(
+    f"💾 Auto Saved ({time_now})"
+)
+
+notes_win.setWindowTitle(
+    "Smart Notes Ultra V4"
+)
+
 
 # ================= UTIL =================
 def copy_current_tab():
@@ -667,9 +999,8 @@ def update_word_count():
         )
 
     word_count.setText(
-        f"Words: {total}"
+        f"Words: {total} | Notes: {len(notes)}"
     )
-
 
 def search_notes():
 
@@ -991,6 +1322,32 @@ def export_txt():
 
 
 
+# ================= AUTO SAVE TIMER =================
+auto_save_timer = QTimer()
+
+auto_save_timer.setSingleShot(True)
+
+auto_save_timer.timeout.connect(
+    auto_save
+)
+
+
+def start_auto_save_timer():
+
+    global unsaved_changes
+
+    unsaved_changes = True
+
+    status_label.setText(
+        "✏ Editing..."
+    )
+
+    notes_win.setWindowTitle(
+        "Smart Notes Ultra V4 *"
+    )
+
+    auto_save_timer.start(3000)
+
 
 # ================= CONNECTIONS =================
 btn_copy.clicked.connect(copy_current_tab)
@@ -998,10 +1355,19 @@ btn_paste.clicked.connect(paste_to_current_tab)
 
 btn_new.clicked.connect(add_note)
 btn_delete.clicked.connect(delete_note)
+btn_restore.clicked.connect(
+    restore_note
+)
 btn_save.clicked.connect(save_note)
 btn_rename.clicked.connect(rename_note)
 
 btn_pin.clicked.connect(pin_note)
+btn_color.clicked.connect(
+    color_note
+)
+btn_favorite.clicked.connect(
+    favorite_note
+)
 
 btn_dark.clicked.connect(set_dark_mode)
 btn_light.clicked.connect(set_light_mode)
@@ -1028,6 +1394,10 @@ btn_export.clicked.connect(
     export_txt
 )
 
+btn_restore.clicked.connect(
+    restore_note
+)
+
 
 list_notes.itemSelectionChanged.connect(show_note)
 
@@ -1045,9 +1415,11 @@ for editor in editors:
         update_word_count
     )
 
+    
     editor.textChanged.connect(
-        auto_save
-    )
+    start_auto_save_timer
+)
+
 
 
 # ================= SHORTCUTS =================
@@ -1055,6 +1427,12 @@ QShortcut(
     QKeySequence("Ctrl+S"),
     notes_win,
     save_note
+)
+
+QShortcut(
+    QKeySequence("Ctrl+E"),
+    notes_win,
+    export_txt
 )
 
 QShortcut(
@@ -1117,11 +1495,121 @@ QShortcut(
     paste_to_current_tab
 )
 
+QShortcut(
+    QKeySequence("Ctrl+T"),
+    notes_win,
+    add_todo
+)
+
+QShortcut(
+    QKeySequence("Ctrl+Shift+T"),
+    notes_win,
+    check_todo
+)
+
+QShortcut(
+    QKeySequence("Ctrl+Alt+T"),
+    notes_win,
+    uncheck_todo
+)
+
+QShortcut(
+    QKeySequence("Ctrl+Tab"),
+    notes_win,
+    lambda: tabs.setCurrentIndex(
+        (tabs.currentIndex() + 1)
+        % tabs.count()
+    )
+)
+
+QShortcut(
+    QKeySequence("Ctrl+Shift+Tab"),
+    notes_win,
+    lambda: tabs.setCurrentIndex(
+        (tabs.currentIndex() - 1)
+        % tabs.count()
+    )
+)
+
+QShortcut(
+    QKeySequence("Ctrl+R"),
+    notes_win,
+    rename_note
+)
+
+QShortcut(
+    QKeySequence("Ctrl+Shift+R"),
+    notes_win,
+    restore_note
+)
+
+QShortcut(
+    QKeySequence("Ctrl+Shift+P"),
+    notes_win,
+    color_note
+)
+
+QShortcut(
+    QKeySequence("Ctrl+Shift+F"),
+    notes_win,
+    favorite_note
+)
+
+QShortcut(
+    QKeySequence("Ctrl+Shift+D"),
+    notes_win,
+    set_dark_mode
+)
+
+QShortcut(
+    QKeySequence("Ctrl+Shift+L"),
+    notes_win,
+    set_light_mode
+)
+
+QShortcut(
+    QKeySequence("Ctrl+Shift+B"),
+    notes_win,
+    blue_theme
+)
+
+QShortcut(
+    QKeySequence("Ctrl+Shift+M"),
+    notes_win,
+    red_theme
+)
+
+QShortcut(
+    QKeySequence("Ctrl+Shift+H"),
+    notes_win,
+    hacker_theme
+)
+
+
+def closeEvent(event):
+
+    auto_save()
+
+    event.accept()
+
 
 # ================= START =================
 load_data()
 
 refresh_notes_list()
+
+if len(notes) == 0:
+
+    notes["Quick Notes"] = [
+        "",
+        "",
+        "",
+        ""
+    ]
+
+    save_data()
+
+    refresh_notes_list()
 
 if current_theme == "dark":
     set_dark_mode()
@@ -1155,8 +1643,22 @@ if last_opened_note in notes:
 
             break
 
+notes_win.closeEvent = closeEvent
+
+
+if list_notes.count() > 0:
+
+    list_notes.setCurrentRow(0)
+
+    show_note()
+
 
 notes_win.show()
+
+
+
+
+
 
 app.exec_()
 
