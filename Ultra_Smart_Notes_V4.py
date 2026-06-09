@@ -70,8 +70,16 @@ BACKUP_FILE = "backup/notes_backup.json"
 notes = {}
 pinned_notes = []
 recent_notes = []
-
+last_edited = {}
 recycle_bin = {}
+
+
+
+
+note_folders = {}
+
+folders = []
+
 
 
 note_colors = {}
@@ -89,8 +97,11 @@ unsaved_changes = False
 
 
 # ================= WIDGETS =================
-list_notes = QListWidget()
-list_notes.setMinimumWidth(250)
+tree_notes = QTreeWidget()
+
+tree_notes.setAnimated(True)
+tree_notes.setHeaderHidden(True)
+tree_notes.setMinimumWidth(350)
 
 search_bar = QLineEdit()
 search_bar.setPlaceholderText("🔍 Find notes...")
@@ -98,8 +109,14 @@ search_bar.setPlaceholderText("🔍 Find notes...")
 
 btn_new = QPushButton("➕ New")
 btn_delete = QPushButton("🗑 Delete")
+btn_delete_folder = QPushButton("🗂 Del")
+print("DELETE FOLDER ADA")
 btn_save = QPushButton("💾 Save")
 btn_rename = QPushButton("✏ Rename")
+btn_rename_folder = QPushButton(
+    "📂 Rename Folder"
+)
+btn_move = QPushButton("📂 Move")
 
 btn_dark = QPushButton("🌙 Dark")
 btn_light = QPushButton("☀ Light")
@@ -130,8 +147,16 @@ btn_clear = QPushButton("🧹 Clear")
 
 btn_export = QPushButton("📄 Export TXT")
 
+btn_export_pdf = QPushButton(
+    "📕 Export PDF"
+)
+
 btn_restore = QPushButton(
     "♻ Restore"
+)
+
+btn_stats = QPushButton(
+    "📊 Stats"
 )
 
 
@@ -145,6 +170,15 @@ font_size.setValue(14)
 word_count = QLabel("Words: 0")
 status_label = QLabel("✅ Ready")
 
+last_edit_label = QLabel(
+    "🕒 Never"
+)
+
+bottom_bar = QHBoxLayout()
+
+bottom_bar.addWidget(status_label)
+
+bottom_bar.addStretch()
 
 # ================= TABS =================
 tabs = QTabWidget()
@@ -182,18 +216,27 @@ left_layout.addWidget(
 )
 
 left_layout.addWidget(search_bar)
-left_layout.addWidget(list_notes)
+left_layout.addWidget(
+    tree_notes,
+    stretch=1
+)
 
 left_layout.addWidget(btn_new)
-feature_layout_2 = QHBoxLayout()
+feature_layout_2 = QVBoxLayout()
 
-feature_layout_2.addWidget(btn_rename)
-feature_layout_2.addWidget(btn_delete)
-feature_layout_2.addWidget(btn_save)
+row1 = QHBoxLayout()
+row2 = QHBoxLayout()
 
-left_layout.addLayout(
-    feature_layout_2
-)
+row1.addWidget(btn_rename)
+row1.addWidget(btn_rename_folder)
+row1.addWidget(btn_move)
+
+row2.addWidget(btn_delete)
+row2.addWidget(btn_delete_folder)
+row2.addWidget(btn_save)
+
+feature_layout_2.addLayout(row1)
+feature_layout_2.addLayout(row2)
 
 feature_layout_1 = QHBoxLayout()
 
@@ -218,7 +261,11 @@ left_layout.addWidget(btn_date)
 
 left_layout.addWidget(btn_clear)
 left_layout.addWidget(btn_export)
+left_layout.addWidget(
+    btn_export_pdf
+)
 left_layout.addWidget(btn_restore)
+left_layout.addWidget(btn_stats)
 
 
 theme_layout = QHBoxLayout()
@@ -251,24 +298,33 @@ toolbar.addWidget(btn_underline)
 toolbar.addStretch()
 
 toolbar.addWidget(word_count)
-toolbar.addWidget(status_label)
+
+toolbar.addSpacing(10)
+
+toolbar.addWidget(last_edit_label)
+
+toolbar.addSpacing(10)
+
+# toolbar.addWidget(status_label)
 
 right_layout.addLayout(toolbar)
 right_layout.addWidget(tabs)
+right_layout.addLayout(bottom_bar)
+
+
 
 
 # ================= MAIN LAYOUT =================
 main_layout = QHBoxLayout()
 
-main_layout.addLayout(left_layout, 25)
-main_layout.addLayout(right_layout, 75)
+main_layout.addLayout(left_layout, 30)
+main_layout.addLayout(right_layout, 70)
 
 notes_win.setLayout(main_layout)
 
 
 # ================= FUNCTIONS =================
 def get_real_note_name(name):
-
 
     prefixes = [
         "⭐ ",
@@ -294,7 +350,113 @@ def get_real_note_name(name):
 
                 changed = True
 
+    # HAPUS INFO FOLDER
+    if " | " in name:
+
+        name = name.split(
+            " | ",
+            1
+        )[1]
+
     return name
+
+
+
+def refresh_tree():
+
+    tree_notes.clear()
+
+    folder_items = {}
+
+    for folder in folders:
+
+        folder_item = QTreeWidgetItem(
+            [f"📂 {folder}"]
+        )
+
+        tree_notes.addTopLevelItem(
+            folder_item
+        )
+
+        folder_items[folder] = folder_item
+
+    for note, folder in note_folders.items():
+
+        if folder not in folders:
+
+            folder_item = QTreeWidgetItem(
+                [f"📂 {folder}"]
+            )
+
+            tree_notes.addTopLevelItem(
+                folder_item
+            )
+
+            folder_items[folder] = folder_item
+
+        note_item = QTreeWidgetItem(
+            [note]
+        )
+
+        folder_items[folder].addChild(
+            note_item
+        )
+
+    # tree_notes.expandAll()
+
+
+def rename_folder():
+
+
+    selected = tree_notes.currentItem()
+
+    if not selected:
+        return
+
+    if selected.parent() is not None:
+
+        QMessageBox.information(
+            notes_win,
+            "Folder",
+            "Pilih folder dulu 😁"
+        )
+
+        return
+
+    old_folder = selected.text(0)
+
+    old_folder = old_folder.replace(
+        "📂 ",
+        ""
+    )
+
+    new_folder, ok = QInputDialog.getText(
+        notes_win,
+        "Rename Folder",
+        "Nama folder baru:"
+    )
+
+    if not ok:
+        return
+
+    new_folder = new_folder.strip()
+
+    if new_folder == "":
+        return
+
+    for note in note_folders:
+
+        if note_folders[note] == old_folder:
+
+            note_folders[note] = new_folder
+
+    refresh_tree()
+
+    save_data()
+
+    status_label.setText(
+        "📂 Folder Renamed"
+    )
 
 
 
@@ -304,16 +466,16 @@ def refresh_notes_list():
 
     current_note = None
 
-    selected = list_notes.currentItem()
+    selected = tree_notes.currentItem()
 
     if selected:
         current_note = get_real_note_name(
-            selected.text()
+            selected.text(0)
         )
 
-    list_notes.blockSignals(True)
+    tree_notes.blockSignals(True)
 
-    list_notes.clear()
+    tree_notes.clear()
 
     # PINNED
     for note in pinned_notes:
@@ -333,7 +495,7 @@ def refresh_notes_list():
                 QColor(note_colors[note])
             )
 
-        list_notes.addItem(item)
+        tree_notes.addItem(item)
 
     # RECENT
     for note in recent_notes:
@@ -356,7 +518,7 @@ def refresh_notes_list():
                 QColor(note_colors[note])
             )
 
-        list_notes.addItem(item)
+        tree_notes.addItem(item)
 
     # NORMAL
     for note in notes:
@@ -367,34 +529,44 @@ def refresh_notes_list():
         if note in recent_notes:
             continue
 
-        display_name = note
+        folder = note_folders.get(
+            note,
+            "General"
+        )
+
+        display_name = (
+            f"📁 {folder} | {note}"
+        )
 
         if note in favorite_notes:
             display_name = "⭐ " + display_name
 
-        item = QListWidgetItem(display_name)
+        item = QListWidgetItem(
+            display_name
+        )
 
         if note in note_colors:
             item.setForeground(
-                QColor(note_colors[note])
+                QColor(
+                    note_colors[note]
+                )
             )
 
-        list_notes.addItem(item)
+        tree_notes.addItem(item)
 
-    list_notes.blockSignals(False)
+    tree_notes.blockSignals(False)
 
     if current_note:
 
-        for i in range(list_notes.count()):
+        for i in range(tree_notes.count()):
 
-            item = list_notes.item(i)
+            item = tree_notes.item(i)
 
             if current_note in item.text():
 
-                list_notes.setCurrentItem(item)
+                tree_notes.setCurrentItem(item)
 
                 break
-
 
 
 
@@ -445,12 +617,19 @@ def save_data():
 
     data = {
 
-        "notes": notes,
-        "pinned": pinned_notes,
-        "last_opened": last_opened_note,
-        "theme": current_theme
+    "notes": notes,
 
-    }
+    "folder_list": folders,
+
+    "pinned": pinned_notes,
+
+    "folders": note_folders,
+
+    "last_opened": last_opened_note,
+
+    "theme": current_theme
+
+}
 
     with open(
         FILE_NAME,
@@ -494,7 +673,9 @@ def save_data():
 def load_data():
 
     global notes
+    global folders
     global pinned_notes
+    global note_folders
     global recycle_bin
     global recent_notes
     global favorite_notes
@@ -522,9 +703,19 @@ def load_data():
                     {}
                 )
 
+                folders = data.get(
+                    "folder_list",
+                    []
+                )
+
                 pinned_notes = data.get(
                     "pinned",
                     []
+                )
+
+                note_folders = data.get(
+                    "folders",
+                    {}
                 )
 
                 recycle_bin = data.get(
@@ -613,9 +804,29 @@ def add_note():
         "Masukkan nama note:"
     )
 
+    
+
     if ok and note_name.strip() != "":
 
         note_name = note_name.strip()
+
+        folder, ok2 = QInputDialog.getText(
+    notes_win,
+    "Folder",
+    "Nama folder:"
+)
+
+        if not ok2:
+            return
+
+        folder = folder.strip()
+
+        if folder not in folders:
+
+            folders.append(folder)
+
+        if folder == "":
+            folder = "General"
 
         if note_name not in notes:
 
@@ -626,9 +837,13 @@ def add_note():
                 ""
             ]
 
+            note_folders[note_name] = folder
+
             print("NOTES SEKARANG:", notes)
 
-            refresh_notes_list()
+            refresh_tree()
+
+            print("FOLDERS SEKARANG:", note_folders)
 
             update_word_count()
 
@@ -642,7 +857,8 @@ def add_note():
 
 def delete_note():
 
-    selected = list_notes.currentItem()
+
+    selected = tree_notes.currentItem()
 
     if not selected:
 
@@ -655,7 +871,7 @@ def delete_note():
         return
 
     note_name = get_real_note_name(
-        selected.text()
+        selected.text(0)
     )
 
     confirm = QMessageBox.question(
@@ -673,7 +889,10 @@ def delete_note():
 
         recycle_bin[note_name] = notes[note_name]
 
-    del notes[note_name]
+        del notes[note_name]
+
+    if note_name in note_folders:
+        del note_folders[note_name]
 
     # HAPUS PIN
     if note_name in pinned_notes:
@@ -689,9 +908,9 @@ def delete_note():
         editor.blockSignals(False)
 
     # HAPUS SELECTION
-    list_notes.clearSelection()
+    tree_notes.clearSelection()
 
-    refresh_notes_list()
+    refresh_tree()
 
     update_word_count()
 
@@ -700,6 +919,10 @@ def delete_note():
     status_label.setText(
         "🗑 Note Deleted"
     )
+
+    print("FOLDERS =", folders)
+    print("NOTE_FOLDERS =", note_folders)
+
 
 
 def restore_note():
@@ -729,7 +952,7 @@ def restore_note():
             note_name
         )
 
-        refresh_notes_list()
+        refresh_tree()
 
         save_data()
 
@@ -741,13 +964,13 @@ def restore_note():
 
 def rename_note():
 
-    selected = list_notes.currentItem()
+    selected = tree_notes.currentItem()
 
     if not selected:
         return
 
     old_name = get_real_note_name(
-        selected.text()
+        selected.text(0)
     )
 
     new_name, ok = QInputDialog.getText(
@@ -762,20 +985,108 @@ def rename_note():
 
         notes[new_name] = notes.pop(old_name)
 
-        refresh_notes_list()
+    if old_name in note_folders:
+        note_folders[new_name] = note_folders.pop(old_name)
+
+        refresh_tree()
 
         save_data()
 
 
+def delete_folder():
+
+    selected = tree_notes.currentItem()
+
+    if not selected:
+        return
+
+    if selected.parent() is not None:
+        return
+
+    folder_name = selected.text(0)
+
+    folder_name = folder_name.replace(
+        "📂 ",
+        ""
+    )
+
+    confirm = QMessageBox.question(
+        notes_win,
+        "Delete Folder",
+        f"Hapus folder '{folder_name}' ?",
+        QMessageBox.Yes | QMessageBox.No
+    )
+
+    if confirm != QMessageBox.Yes:
+        return
+
+    if folder_name in folders:
+
+        folders.remove(folder_name)
+
+    refresh_tree()
+
+    save_data()
+
+
+def move_note():
+
+
+    selected = tree_notes.currentItem()
+
+    if not selected:
+        return
+
+    if selected.parent() is None:
+        return
+
+    note_name = selected.text(0)
+
+    folders = []
+
+    for i in range(tree_notes.topLevelItemCount()):
+
+        folder_item = tree_notes.topLevelItem(i)
+
+        folder_name = folder_item.text(0)
+
+        folder_name = folder_name.replace(
+            "📂 ",
+            ""
+        )
+
+        folders.append(folder_name)
+
+    folder, ok = QInputDialog.getItem(
+        notes_win,
+        "Move Note",
+        "Pilih Folder:",
+        folders,
+        0,
+        False
+    )
+
+    if ok:
+
+        note_folders[note_name] = folder
+
+        refresh_tree()
+
+        save_data()
+
+
+    
+
+
 def pin_note():
 
-    selected = list_notes.currentItem()
+    selected = tree_notes.currentItem()
 
     if not selected:
         return
 
     note_name = get_real_note_name(
-        selected.text()
+        selected.text(0)
     )
 
     if note_name in pinned_notes:
@@ -786,20 +1097,20 @@ def pin_note():
 
         pinned_notes.append(note_name)
 
-    refresh_notes_list()
+    refresh_tree()
 
     save_data()
 
 
 def color_note():
 
-    selected = list_notes.currentItem()
+    selected = tree_notes.currentItem()
 
     if not selected:
         return
 
     note_name = get_real_note_name(
-        selected.text()
+        selected.text(0)
     )
 
     color = QColorDialog.getColor()
@@ -808,20 +1119,20 @@ def color_note():
 
         note_colors[note_name] = color.name()
 
-        refresh_notes_list()
+        refresh_tree()
 
         save_data()
 
 
 def favorite_note():
 
-    selected = list_notes.currentItem()
+    selected = tree_notes.currentItem()
 
     if not selected:
         return
 
     note_name = get_real_note_name(
-        selected.text()
+        selected.text(0)
     )
 
     note_name = note_name.replace(
@@ -841,7 +1152,7 @@ def favorite_note():
             note_name
         )
 
-    refresh_notes_list()
+    refresh_tree()
 
     save_data()
 
@@ -851,13 +1162,16 @@ def show_note():
     global loading_note
     global last_opened_note
 
-    selected = list_notes.currentItem()
+    selected = tree_notes.currentItem()
 
     if not selected:
         return
+    
+    if selected.childCount() > 0:
+        return
 
     note_name = get_real_note_name(
-        selected.text()
+        selected.text(0)
     )
 
     if note_name not in notes:
@@ -889,18 +1203,30 @@ def show_note():
 
     save_data()
 
+    if note_name in last_edited:
+
+        last_edit_label.setText(
+            "🕒 " + last_edited[note_name]
+        )
+
+    else:
+
+        last_edit_label.setText(
+            "🕒 Never"
+        )
+
     update_word_count()
 
 
 def save_note():
 
-    selected = list_notes.currentItem()
+    selected = tree_notes.currentItem()
 
     if not selected:
         return
 
     note_name = get_real_note_name(
-        selected.text()
+        selected.text(0)
     )
 
     notes[note_name] = [
@@ -909,6 +1235,12 @@ def save_note():
 
         for editor in editors
     ]
+
+    last_edited[note_name] = QDateTime.currentDateTime().toString(
+        "dd MMM yyyy HH:mm:ss"
+    )
+
+    print("LAST EDITED:", last_edited)
 
     save_data()
 
@@ -920,43 +1252,46 @@ def save_note():
 def auto_save():
 
     global loading_note
+    global unsaved_changes
 
     if loading_note:
         return
 
-    selected = list_notes.currentItem()
+    selected = tree_notes.currentItem()
 
     if not selected:
         return
 
     note_name = get_real_note_name(
-        selected.text()
+        selected.text(0)
     )
 
     notes[note_name] = [
-
         editor.toHtml()
-
         for editor in editors
     ]
 
+    last_edited[note_name] = (
+        QDateTime.currentDateTime().toString(
+            "dd MMM yyyy HH:mm:ss"
+        )
+    )
+
     save_data()
 
-    global unsaved_changes
+    unsaved_changes = False
 
-unsaved_changes = False
+    time_now = QTime.currentTime().toString(
+        "HH:mm:ss"
+    )
 
-time_now = QTime.currentTime().toString(
-    "HH:mm:ss"
-)
+    status_label.setText(
+        f"💾 Auto Saved ({time_now})"
+    )
 
-status_label.setText(
-    f"💾 Auto Saved ({time_now})"
-)
-
-notes_win.setWindowTitle(
-    "Smart Notes Ultra V4"
-)
+    notes_win.setWindowTitle(
+        "Smart Notes Ultra V4"
+    )
 
 
 # ================= UTIL =================
@@ -1004,15 +1339,13 @@ def update_word_count():
 
 def search_notes():
 
-    text = search_bar.text().lower()
 
-    for i in range(list_notes.count()):
+    QMessageBox.information(
+        notes_win,
+        "Info",
+        "🔍 Search sedang diperbaiki untuk Tree View"
+    )
 
-        item = list_notes.item(i)
-
-        item.setHidden(
-            text not in item.text().lower()
-        )
 
 
 def change_font_size():
@@ -1273,7 +1606,7 @@ def insert_date():
 
 def export_txt():
 
-    selected = list_notes.currentItem()
+    selected = tree_notes.currentItem()
 
     if not selected:
 
@@ -1286,7 +1619,7 @@ def export_txt():
         return
 
     note_name = get_real_note_name(
-        selected.text()
+        selected.text(0)
     )
 
     content = ""
@@ -1322,6 +1655,91 @@ def export_txt():
 
 
 
+def export_pdf():
+
+    selected = tree_notes.currentItem()
+
+    if not selected:
+
+        QMessageBox.warning(
+            notes_win,
+            "Error",
+            "⚠ Pilih note dulu!"
+        )
+
+        return
+
+    note_name = get_real_note_name(
+        selected.text(0)
+    )
+
+    file_name, _ = QFileDialog.getSaveFileName(
+        notes_win,
+        "Export PDF",
+        f"{note_name}.pdf",
+        "PDF Files (*.pdf)"
+    )
+
+    if not file_name:
+        return
+
+    from reportlab.platypus import (
+        SimpleDocTemplate,
+        Paragraph,
+        Spacer
+    )
+
+    from reportlab.lib.styles import (
+        getSampleStyleSheet
+    )
+
+    pdf = SimpleDocTemplate(
+        file_name
+    )
+
+    styles = getSampleStyleSheet()
+
+    content = []
+
+    for i, editor in enumerate(editors):
+
+        content.append(
+            Paragraph(
+                f"<b>TAB {i+1}</b>",
+                styles["Heading2"]
+            )
+        )
+
+        content.append(
+            Spacer(1, 10)
+        )
+
+        text = editor.toPlainText()
+
+        text = text.replace(
+            "\n",
+            "<br/>"
+        )
+
+        content.append(
+            Paragraph(
+                text,
+                styles["BodyText"]
+            )
+        )
+
+        content.append(
+            Spacer(1, 20)
+        )
+
+    pdf.build(content)
+
+    status_label.setText(
+        "📕 Exported PDF"
+    )
+
+
+
 # ================= AUTO SAVE TIMER =================
 auto_save_timer = QTimer()
 
@@ -1349,17 +1767,81 @@ def start_auto_save_timer():
     auto_save_timer.start(3000)
 
 
+def show_stats():
+
+    total_notes = len(notes)
+
+    total_folders = len(
+        set(note_folders.values())
+    )
+
+    total_favorites = len(
+        favorite_notes
+    )
+
+    total_pinned = len(
+        pinned_notes
+    )
+
+    total_words = 0
+    total_characters = 0
+
+    for note_data in notes.values():
+
+        for tab_content in note_data:
+
+            text = QTextDocument()
+
+            text.setHtml(tab_content)
+
+            plain = text.toPlainText()
+
+            total_words += len(
+                plain.split()
+            )
+
+            total_characters += len(
+                plain
+            )
+
+    QMessageBox.information(
+        notes_win,
+        "📊 Smart Notes Statistics",
+
+        f"""
+📄 Notes        : {total_notes}
+
+📂 Folders      : {total_folders}
+
+⭐ Favorites    : {total_favorites}
+
+📌 Pinned       : {total_pinned}
+
+📝 Words        : {total_words}
+
+🔠 Characters   : {total_characters}
+"""
+    )
+
+
 # ================= CONNECTIONS =================
 btn_copy.clicked.connect(copy_current_tab)
 btn_paste.clicked.connect(paste_to_current_tab)
 
 btn_new.clicked.connect(add_note)
 btn_delete.clicked.connect(delete_note)
+btn_delete_folder.clicked.connect(
+    delete_folder
+)
 btn_restore.clicked.connect(
     restore_note
 )
 btn_save.clicked.connect(save_note)
 btn_rename.clicked.connect(rename_note)
+btn_rename_folder.clicked.connect(
+    rename_folder
+)
+btn_move.clicked.connect(move_note)
 
 btn_pin.clicked.connect(pin_note)
 btn_color.clicked.connect(
@@ -1387,6 +1869,9 @@ btn_uncheck.clicked.connect(uncheck_todo)
 btn_lock.clicked.connect(lock_note)
 
 btn_date.clicked.connect(insert_date)
+btn_stats.clicked.connect(
+    show_stats
+)
 
 btn_clear.clicked.connect(clear_current_tab)
 
@@ -1394,12 +1879,16 @@ btn_export.clicked.connect(
     export_txt
 )
 
+btn_export_pdf.clicked.connect(
+    export_pdf
+)
+
 btn_restore.clicked.connect(
     restore_note
 )
 
 
-list_notes.itemSelectionChanged.connect(show_note)
+tree_notes.itemSelectionChanged.connect(show_note)
 
 search_bar.textChanged.connect(
     search_notes
@@ -1585,6 +2074,17 @@ QShortcut(
     hacker_theme
 )
 
+QShortcut(
+    QKeySequence("Ctrl+Shift+E"),
+    notes_win,
+    export_pdf
+)
+
+QShortcut(
+    QKeySequence("Ctrl+G"),
+    notes_win,
+    show_stats
+)
 
 def closeEvent(event):
 
@@ -1596,7 +2096,9 @@ def closeEvent(event):
 # ================= START =================
 load_data()
 
-refresh_notes_list()
+print("NOTE FOLDERS:", note_folders)
+
+refresh_tree()
 
 if len(notes) == 0:
 
@@ -1607,9 +2109,11 @@ if len(notes) == 0:
         ""
     ]
 
+    note_folders["Quick Notes"] = "General"
+
     save_data()
 
-    refresh_notes_list()
+    refresh_tree()
 
 if current_theme == "dark":
     set_dark_mode()
@@ -1627,30 +2131,30 @@ elif current_theme == "hacker":
     hacker_theme()
 
 
-if last_opened_note in notes:
+# if last_opened_note in notes:
 
-    for i in range(list_notes.count()):
+#     for i in range(list_notes.count()):
 
-        item = list_notes.item(i)
+#         item = list_notes.item(i)
 
-        if get_real_note_name(
-            item.text()
-        ) == last_opened_note:
+#         if get_real_note_name(
+#             item.text()
+#         ) == last_opened_note:
 
-            list_notes.setCurrentItem(item)
+#             list_notes.setCurrentItem(item)
 
-            show_note()
+#             show_note()
 
-            break
+#             break
 
-notes_win.closeEvent = closeEvent
+# notes_win.closeEvent = closeEvent
 
 
-if list_notes.count() > 0:
+# if list_notes.count() > 0:
 
-    list_notes.setCurrentRow(0)
+#     list_notes.setCurrentRow(0)
 
-    show_note()
+#     show_note()
 
 
 notes_win.show()
