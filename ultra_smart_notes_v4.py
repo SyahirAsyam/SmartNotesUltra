@@ -2,6 +2,7 @@
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
+from PyQt5.QtWidgets import QMessageBox
 
 import sys
 import os
@@ -19,6 +20,57 @@ ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
 
 # ================= APP =================
 app = QApplication(sys.argv)
+
+# ================= WELCOME SCREEN =================
+
+welcome_win = QWidget()
+
+welcome_win.setWindowTitle(
+    "Ultra Smart Notes V4"
+)
+
+welcome_win.resize(
+    400,
+    250
+)
+
+layout = QVBoxLayout()
+
+title = QLabel(
+    "📝 Ultra Smart Notes V4"
+)
+
+title.setAlignment(
+    Qt.AlignCenter
+)
+
+btn_start = QPushButton(
+    "🚀 Open Notes"
+)
+
+layout.addWidget(
+    title
+)
+
+layout.addWidget(
+    btn_start
+)
+
+welcome_win.setLayout(
+    layout
+)
+
+title = QLabel(
+"""
+📝 Ultra Smart Notes
+
+Version 4
+
+Write Smarter.
+Think Bigger.
+"""
+)
+
 
 
 # ================= ICON PATH =================
@@ -73,6 +125,8 @@ recent_notes = []
 last_edited = {}
 recycle_bin = {}
 
+recycle_days = 1
+
 
 
 
@@ -110,8 +164,13 @@ search_bar = QLineEdit()
 search_bar.setPlaceholderText("🔍 Find notes...")
 
 
+
+
 btn_new = QPushButton("➕ New")
 btn_delete = QPushButton("🗑 Delete")
+btn_about = QPushButton("ℹ About")
+
+
 btn_new_folder = QPushButton(
     "📂 New Folder"
 )
@@ -242,6 +301,7 @@ row2 = QHBoxLayout()
 row_new = QHBoxLayout()
 
 row_new.addWidget(btn_new)
+
 row_new.addWidget(btn_new_folder)
 
 left_layout.addLayout(row_new)
@@ -319,6 +379,7 @@ toolbar.addWidget(btn_paste)
 toolbar.addWidget(btn_bold)
 toolbar.addWidget(btn_italic)
 toolbar.addWidget(btn_underline)
+toolbar.addWidget(btn_about)
 
 toolbar.addStretch()
 
@@ -349,6 +410,51 @@ notes_win.setLayout(main_layout)
 
 
 # ================= FUNCTIONS =================
+
+
+def show_about():
+
+    QMessageBox.information(
+        notes_win,
+        "About Ultra Smart Notes",
+
+        """
+Ultra Smart Notes V4
+
+Developer:
+Syahir Asyam
+
+Features:
+✅ Folder
+✅ Recycle Bin
+✅ Favorites
+✅ Themes
+✅ Backup System
+
+Built with Python + PyQt5
+
+© 2026
+        """
+    )
+
+def show_welcome():
+
+    QMessageBox.information(
+        notes_win,
+        "Welcome",
+
+        """
+👋 Selamat Datang
+
+Ultra Smart Notes V4
+
+Terima kasih telah menggunakan aplikasi ini.
+
+Semoga produktif,
+dan jangan lupa backup 😁
+        """
+    )
+
 def get_real_note_name(name):
 
     prefixes = [
@@ -388,6 +494,28 @@ def get_real_note_name(name):
 
 
 def refresh_tree():
+
+    expanded_folders = []
+
+    selected_note = None
+
+    for i in range(tree_notes.topLevelItemCount()):
+
+        item = tree_notes.topLevelItem(i)
+
+        if item.isExpanded():
+
+            expanded_folders.append(
+                item.text(0)
+            )
+
+    selected = tree_notes.currentItem()
+
+    if selected:
+
+        selected_note = get_real_note_name(
+            selected.text(0)
+        )
 
     tree_notes.clear()
 
@@ -435,7 +563,23 @@ def refresh_tree():
             note_item
         )
 
-    # tree_notes.expandAll()
+    for i in range(tree_notes.topLevelItemCount()):
+
+        folder_item = tree_notes.topLevelItem(i)
+
+        if folder_item.text(0) in expanded_folders:
+
+            folder_item.setExpanded(True)
+
+            for j in range(folder_item.childCount()):
+
+                note_item = folder_item.child(j)
+
+                if note_item.text(0) == selected_note:
+
+                    tree_notes.setCurrentItem(
+                        note_item
+                    )
 
 
 def rename_folder():
@@ -485,6 +629,10 @@ def rename_folder():
 
     refresh_tree()
 
+    print(
+    "SAVE DIPANGGIL DARI SINI"
+)
+
     save_data()
 
     status_label.setText(
@@ -507,6 +655,8 @@ def refresh_notes_list():
         )
 
     tree_notes.blockSignals(True)
+
+    
 
     tree_notes.clear()
 
@@ -648,23 +798,48 @@ def create_backup():
 
 def save_data():
 
+    import traceback
+
+    print("\n===== SAVE TRACE =====")
+
+    traceback.print_stack()
+
+    print("======================\n")
+
+
     data = {
 
-    "notes": notes,
+        "notes": notes,
 
-    "folder_list": folders,
+        "folder_list": folders,
 
-    "pinned": pinned_notes,
+        "pinned": pinned_notes,
 
-    "recycle_bin": recycle_bin,
+        "favorites": favorite_notes,
 
-    "folders": note_folders,
+        "recent": recent_notes,
 
-    "last_opened": last_opened_note,
+        "colors": note_colors,
 
-    "theme": current_theme
+        "recycle_bin": recycle_bin,
 
-}
+        "folders": note_folders,
+
+        "last_opened": last_opened_note,
+
+        "theme": current_theme,
+
+        "recycle_days": recycle_days
+
+    }
+
+
+    print("SAVE DIPANGGIL")
+    print("recycle_days =", recycle_days)
+    print(
+        "SAVE recycle_days =",
+        recycle_days
+    )
 
     with open(
         FILE_NAME,
@@ -682,6 +857,7 @@ def save_data():
     lock_data = {
 
         "locked": locked,
+
         "password": note_password
 
     }
@@ -699,13 +875,13 @@ def save_data():
             indent=4
         )
 
-        
-        create_backup()
+    create_backup()
 
 
 
 
 def load_data():
+
 
     global notes
     global folders
@@ -719,6 +895,7 @@ def load_data():
     global note_password
     global last_opened_note
     global current_theme
+    global recycle_days
 
     # ================= NOTES DATA =================
     if os.path.exists(FILE_NAME):
@@ -732,6 +909,14 @@ def load_data():
             ) as file:
 
                 data = json.load(file)
+
+                print(
+                    "ISI JSON ="
+                )
+
+                print(
+                    data
+                )
 
                 notes = data.get(
                     "notes",
@@ -756,6 +941,29 @@ def load_data():
                 recycle_bin = data.get(
                     "recycle_bin",
                     {}
+                )
+
+                print(
+                    "ISI JSON ="
+                )
+
+                print(
+                    data
+                )
+
+                recycle_days = data.get(
+                    "recycle_days",
+                    recycle_days
+                )
+
+                print(
+                    "LOAD recycle_days =",
+                    recycle_days
+                )
+
+                recycle_days = data.get(
+                    "recycle_days",
+                    1
                 )
 
                 recent_notes = data.get(
@@ -783,19 +991,43 @@ def load_data():
                     "dark"
                 )
 
-        
+                print(
+                    "LOAD recycle_days =",
+                    recycle_days
+                )
+
+                print(
+                    "RECYCLE_DAYS =",
+                    recycle_days
+                )
+
         except Exception as e:
 
-            print("ERROR JSON:", e)
+            print(
+                "ERROR JSON:",
+                e
+            )
 
             notes = {}
+            folders = []
             pinned_notes = []
+            recycle_bin = {}
+            note_folders = {}
+            recent_notes = []
+            favorite_notes = []
+            note_colors = {}
+
             last_opened_note = ""
+
             current_theme = "dark"
 
+            recycle_days = 1
+
+            print(
+    "SAVE DIPANGGIL DARI SINI"
+)
+
             save_data()
-
-
 
     # ================= LOCK DATA =================
     if os.path.exists(LOCK_FILE):
@@ -822,10 +1054,29 @@ def load_data():
 
         except:
 
-            print("ERROR: lock_data.json rusak!")
+            print(
+                "ERROR: lock_data.json rusak!"
+            )
 
             locked = False
+
             note_password = ""
+
+    print(
+        "RECYCLE_DAYS LOADED =",
+        recycle_days
+    )
+
+    print("JSON recycle_days =", recycle_days)
+
+    recycle_days = 1
+
+    print("FORCE recycle_days =", recycle_days)
+
+    print("AAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+
+
+
 
 
 def add_folder():
@@ -849,6 +1100,10 @@ def add_folder():
         folders.append(folder_name)
 
         refresh_tree()
+
+        print(
+    "SAVE DIPANGGIL DARI SINI"
+)
 
         save_data()
 
@@ -909,6 +1164,10 @@ def add_note():
             print("FOLDERS SEKARANG:", note_folders)
 
             update_word_count()
+
+            print(
+    "SAVE DIPANGGIL DARI SINI"
+)
 
             save_data()
 
@@ -992,6 +1251,10 @@ def delete_note():
 
     update_word_count()
 
+    print(
+    "SAVE DIPANGGIL DARI SINI"
+)
+
     save_data()
 
     status_label.setText(
@@ -1065,6 +1328,10 @@ def restore_note():
 
     refresh_tree()
 
+    print(
+    "SAVE DIPANGGIL DARI SINI"
+)
+
     save_data()
 
     status_label.setText(
@@ -1082,9 +1349,30 @@ def rename_note():
     if not selected:
         return
 
+    # kalau yang dipilih folder
+    if selected.parent() is None:
+
+        QMessageBox.warning(
+            notes_win,
+            "Rename",
+            "Pilih NOTE dulu 😁"
+        )
+
+        return
+
     old_name = get_real_note_name(
         selected.text(0)
     )
+
+    if old_name not in notes:
+
+        QMessageBox.warning(
+            notes_win,
+            "Rename",
+            "Note tidak ditemukan 😁"
+        )
+
+        return
 
     new_name, ok = QInputDialog.getText(
         notes_win,
@@ -1098,11 +1386,10 @@ def rename_note():
 
         notes[new_name] = notes.pop(old_name)
 
-    if old_name in note_folders:
-        note_folders[new_name] = note_folders.pop(old_name)
+        if old_name in note_folders:
+            note_folders[new_name] = note_folders.pop(old_name)
 
         refresh_tree()
-
         save_data()
 
 
@@ -1223,6 +1510,10 @@ def delete_folder():
 
     refresh_tree()
 
+    print(
+    "SAVE DIPANGGIL DARI SINI"
+)
+
     save_data()
 
     status_label.setText(
@@ -1232,13 +1523,21 @@ def delete_folder():
 
 def clean_recycle_bin():
 
-    expired_items = []
+
+    global recycle_bin
+
+    if recycle_days == -1:
+
+        return
 
     now = QDateTime.currentDateTime()
+
+    expired_items = []
 
     for name, item in recycle_bin.items():
 
         if not isinstance(item, dict):
+
             continue
 
         deleted_time = item.get(
@@ -1246,20 +1545,32 @@ def clean_recycle_bin():
         )
 
         if not deleted_time:
+
             continue
 
-        deleted_date = (
-            QDateTime.fromString(
-                deleted_time,
-                Qt.ISODate
-            )
+        deleted_date = QDateTime.fromString(
+            deleted_time,
+            Qt.ISODate
         )
 
         days = deleted_date.daysTo(now)
 
-        if days >= 7 * 24 * 3600:  # 7 days in seconds
+        print(
+            f"{name} | Age = {days} days"
+        )
+
+        if recycle_days == 0:
 
             expired_items.append(name)
+
+        elif days >= recycle_days:
+
+            expired_items.append(name)
+
+    print(
+        "EXPIRED ITEMS =",
+        expired_items
+    )
 
     for name in expired_items:
 
@@ -1267,12 +1578,39 @@ def clean_recycle_bin():
 
     if expired_items:
 
+        print(
+    "SAVE DIPANGGIL DARI SINI"
+)
+
         save_data()
 
         print(
-            "AUTO DELETE:",
+            "AUTO DELETED:",
             expired_items
         )
+
+        print("RECYCLE BIN =", recycle_bin)
+
+        print(
+            deleted_time
+        )
+
+        print(
+            deleted_date.toString()
+        )
+
+        print(
+            now.toString()
+        )
+
+        print(
+            "daysTo =",
+            deleted_date.daysTo(now)
+        )
+
+
+
+
 
 
 def show_context_menu(position):
@@ -1389,6 +1727,10 @@ def delete_empty_folders():
 
     refresh_tree()
 
+    print(
+    "SAVE DIPANGGIL DARI SINI"
+)
+
     save_data()
 
     status_label.setText(
@@ -1473,6 +1815,10 @@ def pin_note():
 
     refresh_tree()
 
+    print(
+    "SAVE DIPANGGIL DARI SINI"
+)
+
     save_data()
 
 
@@ -1494,6 +1840,10 @@ def color_note():
         note_colors[note_name] = color.name()
 
         refresh_tree()
+
+        print(
+    "SAVE DIPANGGIL DARI SINI"
+)
 
         save_data()
 
@@ -1532,6 +1882,10 @@ def favorite_note():
     refresh_tree()
 
     print("FAVORITES =", favorite_notes)
+
+    print(
+    "SAVE DIPANGGIL DARI SINI"
+)
 
     save_data()
 \
@@ -1581,6 +1935,10 @@ def show_note():
     if len(recent_notes) > 10:
         recent_notes.pop()
 
+    print(
+    "SAVE DIPANGGIL DARI SINI"
+)
+
     save_data()
 
     if note_name in last_edited:
@@ -1622,6 +1980,10 @@ def save_note():
 
     print("LAST EDITED:", last_edited)
 
+    print(
+    "SAVE DIPANGGIL DARI SINI"
+)
+
     save_data()
 
     status_label.setText(
@@ -1656,6 +2018,10 @@ def auto_save():
             "dd MMM yyyy HH:mm:ss"
         )
     )
+
+    print(
+    "SAVE DIPANGGIL DARI SINI"
+)
 
     save_data()
 
@@ -1778,6 +2144,10 @@ def set_dark_mode():
 
     """)
 
+    print(
+    "SAVE DIPANGGIL DARI SINI"
+)
+
     save_data()
 
 
@@ -1795,6 +2165,10 @@ def set_light_mode():
         }
 
     """)
+
+    print(
+    "SAVE DIPANGGIL DARI SINI"
+)
 
     save_data()
 
@@ -1814,6 +2188,10 @@ def blue_theme():
 
     """)
 
+    print(
+    "SAVE DIPANGGIL DARI SINI"
+)
+
     save_data()
 
 
@@ -1831,6 +2209,10 @@ def red_theme():
         }
 
     """)
+
+    print(
+    "SAVE DIPANGGIL DARI SINI"
+)
 
     save_data()
 
@@ -1850,6 +2232,10 @@ def hacker_theme():
         }
 
     """)
+
+    print(
+    "SAVE DIPANGGIL DARI SINI"
+)
 
     save_data()
 
@@ -1969,6 +2355,10 @@ def lock_note():
             btn_lock.setText(
                 "🔒 Lock"
             )
+
+    print(
+    "SAVE DIPANGGIL DARI SINI"
+)
 
     save_data()
 
@@ -2205,6 +2595,9 @@ def show_stats():
 
 
 # ================= CONNECTIONS =================
+btn_about.clicked.connect(
+    show_about
+)
 btn_copy.clicked.connect(copy_current_tab)
 btn_paste.clicked.connect(paste_to_current_tab)
 
@@ -2483,11 +2876,21 @@ def closeEvent(event):
 
 
 # ================= START =================
+
+
 load_data()
 
 clean_recycle_bin()
 
-print("NOTE FOLDERS:", note_folders)
+print(
+    "RECYCLE_DAYS =",
+    recycle_days
+)
+
+print(
+    "RECYCLE_BIN =",
+    recycle_bin
+)
 
 refresh_tree()
 
@@ -2501,6 +2904,10 @@ if len(notes) == 0:
     ]
 
     note_folders["Quick Notes"] = "General"
+
+    print(
+    "SAVE DIPANGGIL DARI SINI"
+)
 
     save_data()
 
@@ -2548,12 +2955,16 @@ elif current_theme == "hacker":
 #     show_note()
 
 
+
+
+load_data()
+
+clean_recycle_bin()
+
+refresh_tree()
+
+show_welcome()
+
 notes_win.show()
 
-
-
-
-
-
-app.exec_()
-
+app.exec()
