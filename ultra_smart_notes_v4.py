@@ -1,8 +1,44 @@
+import shutil
 
+from UI.About import show_about
+from UI.Welcome import WelcomeScreen
+from Theme.Dark import DARK_THEME
+from Theme.ThemeManager import themes
+from Engine.ThemeEngine import (
+    load_theme,
+    change_theme
+)
+from Engine.ZipEngine import copy_database, create_zip, export_notes, get_backup_name
+from PyQt5.QtWidgets import QFileDialog
+from datetime import datetime
+from PyQt5.QtWidgets import QMessageBox
+from Engine.ZipEngine import create_zip
+from Theme.Light import LIGHT_THEME
+from Engine.SessionEngine import (
+
+    load_session,
+
+    save_session
+
+)
+from Engine.HistoryEngine import (
+
+    load_history,
+
+    save_history
+
+)
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import QMessageBox
+from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtWidgets import (
+    QWidget,
+    QLabel,
+    QVBoxLayout,
+    QProgressBar
+)
 
 import sys
 import os
@@ -11,7 +47,7 @@ import json
 
 
 # ================= APP ID WINDOWS =================
-myappid = "smart.notes.ultra.v4"
+myappid = "smart.notes.ultra.v5"
 
 ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
     myappid
@@ -26,7 +62,7 @@ app = QApplication(sys.argv)
 welcome_win = QWidget()
 
 welcome_win.setWindowTitle(
-    "Ultra Smart Notes V4"
+    "Ultra Smart Notes V5"
 )
 
 welcome_win.resize(
@@ -37,7 +73,7 @@ welcome_win.resize(
 layout = QVBoxLayout()
 
 title = QLabel(
-    "📝 Ultra Smart Notes V4"
+    "📝 Ultra Smart Notes V5"
 )
 
 title.setAlignment(
@@ -64,13 +100,51 @@ title = QLabel(
 """
 📝 Ultra Smart Notes
 
-Version 4
+Version 5
 
 Write Smarter.
 Think Bigger.
 """
 )
 
+
+
+
+
+
+# ================= SETTINGS =================
+settings_window = None
+
+def open_settings():
+
+    global settings_window
+
+    settings_window = QWidget()
+
+    settings_window.setWindowTitle(
+
+        "⚙ Settings"
+
+    )
+
+    settings_window.resize(
+
+        350,
+
+        250
+
+    )
+
+    settings_window.show()
+
+# ================= OUTLINE =================
+themes = {
+
+    "Dark": DARK_THEME,
+
+    "Light": LIGHT_THEME
+
+}
 
 
 # ================= ICON PATH =================
@@ -87,8 +161,10 @@ ICON_PATH = os.path.join(
 # ================= WINDOW =================
 notes_win = QWidget()
 
+notes_win.setStyleSheet(themes["Dark"])
+
 notes_win.setWindowTitle(
-    "Smart Notes Ultra V4"
+    "Smart Notes Ultra V5"
 )
 
 notes_win.resize(1500, 850)
@@ -170,6 +246,9 @@ btn_new = QPushButton("➕ New")
 btn_delete = QPushButton("🗑 Delete")
 btn_about = QPushButton("ℹ About")
 
+btn_open_backup = QPushButton(
+    "📂 Open Backup Folder"
+)
 
 btn_new_folder = QPushButton(
     "📂 New Folder"
@@ -185,6 +264,8 @@ btn_rename_folder = QPushButton(
 )
 btn_delete_folder = QPushButton("📂❌ Remove Folder")
 print("DELETE FOLDER ADA")
+
+btn_zip = QPushButton("🗜 Zip")
 
 btn_move = QPushButton("📂 Move")
 
@@ -227,6 +308,10 @@ btn_restore = QPushButton(
 
 btn_stats = QPushButton(
     "📊 Stats"
+)
+
+btn_settings = QPushButton(
+    "⚙ Settings"
 )
 
 
@@ -303,6 +388,7 @@ row_new = QHBoxLayout()
 row_new.addWidget(btn_new)
 
 row_new.addWidget(btn_new_folder)
+row_new.addWidget(btn_zip)
 
 left_layout.addLayout(row_new)
 
@@ -351,6 +437,7 @@ left_layout.addWidget(
 )
 left_layout.addWidget(btn_restore)
 left_layout.addWidget(btn_stats)
+left_layout.addWidget(btn_settings)
 
 
 theme_layout = QHBoxLayout()
@@ -412,30 +499,6 @@ notes_win.setLayout(main_layout)
 # ================= FUNCTIONS =================
 
 
-def show_about():
-
-    QMessageBox.information(
-        notes_win,
-        "About Ultra Smart Notes",
-
-        """
-Ultra Smart Notes V4
-
-Developer:
-Syahir Asyam
-
-Features:
-✅ Folder
-✅ Recycle Bin
-✅ Favorites
-✅ Themes
-✅ Backup System
-
-Built with Python + PyQt5
-
-© 2026
-        """
-    )
 
 def show_welcome():
 
@@ -446,7 +509,7 @@ def show_welcome():
         """
 👋 Selamat Datang
 
-Ultra Smart Notes V4
+Ultra Smart Notes V5
 
 Terima kasih telah menggunakan aplikasi ini.
 
@@ -580,6 +643,72 @@ def refresh_tree():
                     tree_notes.setCurrentItem(
                         note_item
                     )
+
+
+
+
+def create_zip():
+
+    temp_folder = export_notes()
+
+    copy_database(temp_folder)
+
+    zip_name = get_backup_name()
+
+    shutil.make_archive(
+
+        zip_name,
+
+        "zip",
+
+        temp_folder
+
+    )
+
+    shutil.rmtree(temp_folder)
+
+    return zip_name + ".zip"
+
+
+def open_backup_folder():
+
+    if os.path.exists("Export"):
+
+        os.startfile("Export")
+
+
+def export_notes():
+
+    temp_folder = "BackupTemp"
+
+    if os.path.exists(temp_folder):
+
+        shutil.rmtree(temp_folder)
+
+    os.makedirs(temp_folder)
+
+    return temp_folder
+
+
+
+
+
+def export_backup():
+
+    backup = create_zip()
+
+    QMessageBox.information(
+
+        notes_win,
+
+        "Backup",
+
+        f"📦 Backup berhasil dibuat!\n\n{backup}"
+
+    )
+
+
+
 
 
 def rename_folder():
@@ -1161,20 +1290,31 @@ def add_note():
 
             refresh_tree()
 
-            print("FOLDERS SEKARANG:", note_folders)
+            items = tree_notes.findItems(
+
+                note_name,
+
+                Qt.MatchRecursive
+
+            )
+
+            if items:
+
+                tree_notes.setCurrentItem(
+                    items[0]
+                )
+
+                show_note()
+
+                tabs.currentWidget().setFocus()
 
             update_word_count()
-
-            print(
-    "SAVE DIPANGGIL DARI SINI"
-)
 
             save_data()
 
             status_label.setText(
                 "➕ New Note Added"
             )
-
 
 
 def delete_note():
@@ -1263,6 +1403,38 @@ def delete_note():
 
     print("FOLDERS =", folders)
     print("NOTE_FOLDERS =", note_folders)
+
+
+# ================= HISTORY =================
+def create_note_snapshot(note_name):
+
+    history = load_history()
+
+    if note_name not in history:
+
+        history[note_name] = []
+
+    snapshot = {
+
+        "time": datetime.now().strftime(
+
+            "%d/%m/%Y %H:%M:%S"
+
+        ),
+
+        "tabs": [
+
+            editor.toHtml()
+
+            for editor in editors
+
+        ]
+
+    }
+
+    history[note_name].append(snapshot)
+
+    save_history(history)
 
 
 
@@ -1911,9 +2083,25 @@ def show_note():
     if note_name not in notes:
         return
 
+    if locked:
+
+        QMessageBox.information(
+
+            notes_win,
+
+            "🔒 Locked",
+
+            "Note ini sedang terkunci.\n\n"
+            "Gunakan tombol 🔓 Unlock\n"
+            "untuk membukanya."
+
+        )
+
     loading_note = True
 
     data = notes[note_name]
+
+    print("LOCKED =", locked)
 
     for i in range(4):
 
@@ -1955,6 +2143,39 @@ def show_note():
 
     update_word_count()
 
+    session = load_session()
+
+    session["last_note"] = note_name
+
+    session["last_tab"] = tabs.currentIndex()
+
+    save_session(session)
+
+# ================= SESSION =================
+def restore_session():
+
+    session = load_session()
+
+    last_note = session["last_note"]
+
+    last_tab = session["last_tab"]
+
+    tabs.setCurrentIndex(last_tab)
+
+    items = tree_notes.findItems(
+
+        last_note,
+
+        Qt.MatchRecursive
+
+    )
+
+    if items:
+
+        tree_notes.setCurrentItem(items[0])
+
+        show_note()
+
 
 def save_note():
 
@@ -1981,13 +2202,17 @@ def save_note():
     print("LAST EDITED:", last_edited)
 
     print(
-    "SAVE DIPANGGIL DARI SINI"
-)
+        "SAVE DIPANGGIL DARI SINI"
+    )
+
+    
 
     save_data()
 
-    status_label.setText(
-        "✅ Saved"
+    toast.show_toast(
+
+        "✅ Saved Successfully"
+
     )
 
 
@@ -2020,8 +2245,12 @@ def auto_save():
     )
 
     print(
-    "SAVE DIPANGGIL DARI SINI"
-)
+        "SAVE DIPANGGIL DARI SINI"
+    )
+    
+    create_note_snapshot(
+        note_name
+    )
 
     save_data()
 
@@ -2036,7 +2265,7 @@ def auto_save():
     )
 
     notes_win.setWindowTitle(
-        "Smart Notes Ultra V4"
+        "Smart Notes Ultra V5"
     )
 
 
@@ -2149,6 +2378,21 @@ def set_dark_mode():
 )
 
     save_data()
+
+
+def apply_outline(color):
+
+    notes_win.setStyleSheet(
+
+        DARK_THEME.replace(
+
+            "#FFFFFF",
+
+            color
+
+        )
+
+    )
 
 
 def set_light_mode():
@@ -2531,7 +2775,7 @@ def start_auto_save_timer():
     )
 
     notes_win.setWindowTitle(
-        "Smart Notes Ultra V4 *"
+        "Smart Notes Ultra V5 *"
     )
 
     auto_save_timer.start(3000)
@@ -2596,7 +2840,9 @@ def show_stats():
 
 # ================= CONNECTIONS =================
 btn_about.clicked.connect(
-    show_about
+
+    lambda: show_about(notes_win)
+
 )
 btn_copy.clicked.connect(copy_current_tab)
 btn_paste.clicked.connect(paste_to_current_tab)
@@ -2604,6 +2850,17 @@ btn_paste.clicked.connect(paste_to_current_tab)
 btn_new.clicked.connect(add_note)
 btn_new_folder.clicked.connect(
     add_folder
+)
+btn_open_backup.clicked.connect(
+
+    open_backup_folder
+
+)
+
+btn_zip.clicked.connect(
+
+    export_backup
+
 )
 btn_delete.clicked.connect(delete_note)
 btn_delete_folder.clicked.connect(
@@ -2674,6 +2931,11 @@ tree_notes.itemSelectionChanged.connect(show_note)
 
 search_bar.textChanged.connect(
     search_notes
+)
+btn_settings.clicked.connect(
+
+    open_settings
+
 )
 
 font_size.valueChanged.connect(
@@ -2875,6 +3137,10 @@ def closeEvent(event):
     event.accept()
 
 
+
+
+
+
 # ================= START =================
 
 
@@ -2963,8 +3229,17 @@ clean_recycle_bin()
 
 refresh_tree()
 
+restore_session()
+
 show_welcome()
 
-notes_win.show()
+welcome = WelcomeScreen(notes_win)
+
+welcome.show()
+
+change_theme(
+    notes_win,
+    "Light"
+)
 
 app.exec()
