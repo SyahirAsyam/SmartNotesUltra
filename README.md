@@ -1,4 +1,4 @@
-# 🧠 Ultra Smart Notes V4
+# 🧠 Ultra Smart Notes V5
 
 A modern desktop note-taking application built with **Python** and **PyQt5**.
 
